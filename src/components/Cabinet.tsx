@@ -1,0 +1,376 @@
+import { useStore } from '../store/useStore';
+import { useSpring, animated } from '@react-spring/three';
+import { Edges, Text, ContactShadows } from '@react-three/drei';
+
+const PANEL_THICKNESS = 18; // mm
+const DOOR_THICKNESS = 18; // mm
+
+interface CabinetProps {
+    viewMode?: '3d' | 'plan' | 'elevation' | 'section';
+}
+
+/**
+ * Balanced Technical Dimension Component
+ * Matches the cabinet drawing line weight for an integrated professional look.
+ */
+const DimensionLayout = ({ start, end, label, dir = 'h', offset = 160, fontS = 85 }: any) => {
+    const color = "black";
+    const lineThickness = 4.0; // Balanced boldness to match Edges
+    const arrowSize = 18;
+    const extensionGap = 15;
+    const textGap = 85;
+
+    const dimMaterial = <meshBasicMaterial color={color} />;
+
+    const ArrowHead = ({ position, rotation }: any) => (
+        <group position={position} rotation={rotation}>
+            <mesh rotation-z={Math.PI / 4}>
+                <boxGeometry args={[arrowSize, lineThickness, lineThickness]} />
+                {dimMaterial}
+            </mesh>
+            <mesh rotation-z={-Math.PI / 4}>
+                <boxGeometry args={[arrowSize, lineThickness, lineThickness]} />
+                {dimMaterial}
+            </mesh>
+        </group>
+    );
+
+    if (dir === 'h') {
+        const fullWidth = Math.abs(end[0] - start[0]);
+        const center = (start[0] + end[0]) / 2;
+        const y = start[1] + offset;
+        const extLen = Math.abs(offset) + 25;
+
+        return (
+            <group position-z={start[2]}>
+                {/* Extensions */}
+                <mesh position={[start[0], start[1] + (offset > 0 ? extensionGap + extLen / 2 - 12 : -extensionGap - extLen / 2 + 12), 0]}>
+                    <boxGeometry args={[lineThickness, extLen, lineThickness]} />
+                    {dimMaterial}
+                </mesh>
+                <mesh position={[end[0], end[1] + (offset > 0 ? extensionGap + extLen / 2 - 12 : -extensionGap - extLen / 2 + 12), 0]}>
+                    <boxGeometry args={[lineThickness, extLen, lineThickness]} />
+                    {dimMaterial}
+                </mesh>
+
+                {/* Interrupted Lines */}
+                <mesh position={[start[0] + (fullWidth / 2 - textGap / 2) / 2, y, 0]}>
+                    <boxGeometry args={[(fullWidth - textGap) / 2, lineThickness, lineThickness]} />
+                    {dimMaterial}
+                </mesh>
+                <mesh position={[end[0] - (fullWidth / 2 - textGap / 2) / 2, y, 0]}>
+                    <boxGeometry args={[(fullWidth - textGap) / 2, lineThickness, lineThickness]} />
+                    {dimMaterial}
+                </mesh>
+
+                <ArrowHead position={[start[0], y, 0]} rotation={[0, 0, 0]} />
+                <ArrowHead position={[end[0], y, 0]} rotation={[0, 0, Math.PI]} />
+
+                <Text position={[center, y, 1]} color={color} fontSize={fontS} anchorY="middle" anchorX="center">{label}</Text>
+            </group>
+        );
+    } else {
+        const fullHeight = Math.abs(end[1] - start[1]);
+        const center = (start[1] + end[1]) / 2;
+        const x = start[0] - offset;
+        const extLen = Math.abs(offset) + 25;
+
+        return (
+            <group position-z={start[2]}>
+                {/* Extensions */}
+                <mesh position={[start[0] - (offset > 0 ? extensionGap + extLen / 2 - 12 : -extensionGap - extLen / 2 + 12), start[1], 0]}>
+                    <boxGeometry args={[extLen, lineThickness, lineThickness]} />
+                    {dimMaterial}
+                </mesh>
+                <mesh position={[end[0] - (offset > 0 ? extensionGap + extLen / 2 - 12 : -extensionGap - extLen / 2 + 12), end[1], 0]}>
+                    <boxGeometry args={[extLen, lineThickness, lineThickness]} />
+                    {dimMaterial}
+                </mesh>
+
+                {/* Interrupted Lines */}
+                <mesh position={[x, start[1] - (fullHeight / 2 - textGap / 2) / 2, 0]}>
+                    <boxGeometry args={[lineThickness, (fullHeight - textGap) / 2, lineThickness]} />
+                    {dimMaterial}
+                </mesh>
+                <mesh position={[x, end[1] + (fullHeight / 2 - textGap / 2) / 2, 0]}>
+                    <boxGeometry args={[lineThickness, (fullHeight - textGap) / 2, lineThickness]} />
+                    {dimMaterial}
+                </mesh>
+
+                <ArrowHead position={[x, start[1], 0]} rotation={[0, 0, -Math.PI / 2]} />
+                <ArrowHead position={[x, end[1], 0]} rotation={[0, 0, Math.PI / 2]} />
+
+                <Text position={[x, center, 1]} color={color} fontSize={fontS} anchorY="middle" anchorX="center" rotation-z={Math.PI / 2}>{label}</Text>
+            </group>
+        );
+    }
+};
+
+export const Cabinet = ({ viewMode = '3d' }: CabinetProps) => {
+    const { width, height, depth, numDoors, doorsOpen, numShelves, floorHeight, cabinetColor } = useStore();
+
+    const isTech = viewMode !== '3d';
+    const hideSidePanel = viewMode === 'section';
+
+    const techMaterial = <meshBasicMaterial color="white" polygonOffset polygonOffsetFactor={2} />;
+    const realMaterial = <meshStandardMaterial color={cabinetColor} roughness={0.4} metalness={0.1} />;
+    const accentMaterial = <meshStandardMaterial color={cabinetColor} roughness={0.5} />;
+
+    const currentMaterial = isTech ? techMaterial : realMaterial;
+    const currentAccent = isTech ? techMaterial : accentMaterial;
+
+    const EdgeOverlay = () => isTech ? <Edges color="black" threshold={10} /> : null;
+
+    // Shelves Logic - EQUAL CENTER-TO-CENTER SPACING
+    const shelves: number[] = [];
+    if (numShelves > 0) {
+        // Calculate distance between Center of Bottom Panel and Center of Top Panel
+        const centerToCenterHeight = height - PANEL_THICKNESS;
+        const spacing = centerToCenterHeight / (numShelves + 1);
+
+        for (let i = 0; i < numShelves; i++) {
+            // Start at Bottom Panel Center + spacing
+            const y = (-height / 2 + PANEL_THICKNESS / 2) + spacing * (i + 1);
+            shelves.push(y);
+        }
+    }
+
+    const FONT_SIZE = 90;
+
+    const ShowDimensions = () => {
+        if (!isTech) return null;
+
+        const mainOffset = 180;
+
+        return (
+            <group>
+                {/* Elevation View */}
+                {viewMode === 'elevation' && (
+                    <group position-z={depth / 2}>
+                        <DimensionLayout start={[-width / 2, height / 2, 0]} end={[width / 2, height / 2, 0]} label={`${width}`} dir="h" offset={mainOffset} fontS={FONT_SIZE} />
+                        <DimensionLayout start={[-width / 2, height / 2, 0]} end={[-width / 2, -height / 2, 0]} label={`${height}`} dir="v" offset={mainOffset} fontS={FONT_SIZE} />
+                    </group>
+                )}
+
+                {/* Plan View (Looking down with up=[0,0,-1]) */}
+                {viewMode === 'plan' && (
+                    <group position-y={height / 2} rotation-x={-Math.PI / 2}>
+                        {/* Width on TOP (Anchored at Back: depth/2) */}
+                        <DimensionLayout start={[-width / 2, depth / 2, 0]} end={[width / 2, depth / 2, 0]} label={`${width}`} dir="h" offset={mainOffset} fontS={FONT_SIZE} />
+                        {/* Depth on LEFT */}
+                        <DimensionLayout start={[-width / 2, depth / 2, 0]} end={[-width / 2, -depth / 2, 0]} label={`${depth}`} dir="v" offset={mainOffset} fontS={FONT_SIZE} />
+                    </group>
+                )}
+
+                {/* Section View */}
+                {viewMode === 'section' && (
+                    <group rotation-y={Math.PI / 2} position-x={width / 2}>
+                        {/* Overall Depth (TOP) */}
+                        <DimensionLayout start={[-depth / 2, height / 2, 0]} end={[depth / 2, height / 2, 0]} label={`${depth}`} dir="h" offset={mainOffset} fontS={FONT_SIZE} />
+
+                        {/* Overall Height (LEFT) */}
+                        <DimensionLayout start={[-depth / 2, height / 2, 0]} end={[-depth / 2, -height / 2, 0]} label={`${height}`} dir="v" offset={mainOffset + 120} fontS={FONT_SIZE} />
+
+                        {/* Shelf spaces (LEFT string) - MEASURED TO CENTER LINES */}
+                        {numShelves > 0 && Array.from({ length: numShelves + 1 }).map((_, idx) => {
+                            // Start point (Bottom of dim segment): 
+                            // If first segment, Bottom Panel Center. Else, Previous Shelf Center.
+                            const prevY = idx === 0 ? (-height / 2 + PANEL_THICKNESS / 2) : shelves[idx - 1];
+
+                            // End point (Top of dim segment):
+                            // If last segment, Top Panel Center. Else, Current Shelf Center.
+                            const currentY = idx === numShelves ? (height / 2 - PANEL_THICKNESS / 2) : shelves[idx];
+
+                            const space = Math.round(currentY - prevY);
+
+                            return (
+                                <DimensionLayout
+                                    key={`shelf-dim-${idx}`}
+                                    start={[-depth / 2, currentY, 0]}
+                                    end={[-depth / 2, prevY, 0]}
+                                    label={`${space}`}
+                                    dir="v" offset={mainOffset} fontS={FONT_SIZE}
+                                />
+                            );
+                        })}
+                    </group>
+                )}
+            </group>
+        );
+    };
+
+    return (
+        <group position-y={height / 2 + floorHeight}>
+            {!isTech && (
+                <ContactShadows
+                    opacity={0.8}
+                    scale={4000}
+                    blur={0.5}
+                    resolution={1024}
+                    position={[0, -(height / 2 + floorHeight), 0]} // Anchor to World Floor (Y=0)
+                    far={height + floorHeight + 200} // Ensure capture depth covers the floating cabinet
+                />
+            )}
+
+            <mesh position={[-width / 2 + PANEL_THICKNESS / 2, 0, 0]} key="left-panel" castShadow receiveShadow>
+                <boxGeometry args={[PANEL_THICKNESS, height, depth]} />
+                {currentAccent}
+                <EdgeOverlay />
+            </mesh>
+            {!hideSidePanel && (
+                <mesh position={[width / 2 - PANEL_THICKNESS / 2, 0, 0]} key="right-panel" castShadow receiveShadow>
+                    <boxGeometry args={[PANEL_THICKNESS, height, depth]} />
+                    {currentAccent}
+                    <EdgeOverlay />
+                </mesh>
+            )}
+            <mesh position={[0, height / 2 - PANEL_THICKNESS / 2, 0]} key="top-panel" castShadow receiveShadow>
+                <boxGeometry args={[width - 2 * PANEL_THICKNESS, PANEL_THICKNESS, depth]} />
+                {currentAccent}
+                <EdgeOverlay />
+            </mesh>
+            <mesh position={[0, -height / 2 + PANEL_THICKNESS / 2, 0]} key="bottom-panel" castShadow receiveShadow>
+                <boxGeometry args={[width - 2 * PANEL_THICKNESS, PANEL_THICKNESS, depth]} />
+                {currentAccent}
+                <EdgeOverlay />
+            </mesh>
+            <mesh position={[0, 0, -depth / 2 + PANEL_THICKNESS / 2]} key="back-panel" castShadow receiveShadow>
+                <boxGeometry args={[width, height, PANEL_THICKNESS]} />
+                {currentAccent}
+                <EdgeOverlay />
+            </mesh>
+
+            {/* Shelves */}
+            {shelves.map((y, idx) => (
+                <mesh key={`shelf-${idx}`} position={[0, y, 0]} castShadow receiveShadow>
+                    <boxGeometry args={[width - 2 * PANEL_THICKNESS, PANEL_THICKNESS, depth - 20]} />
+                    {currentMaterial}
+                    <EdgeOverlay />
+                </mesh>
+            ))}
+
+            {/* Doors */}
+            {viewMode !== 'section' && numDoors > 0 && Array.from({ length: numDoors }).map((_, i) => {
+                const singleDoorWidth = width / numDoors;
+                const slotStartX = -width / 2 + i * singleDoorWidth;
+                const isRightHinge = i % 2 !== 0;
+                const pivotX = isRightHinge ? slotStartX + singleDoorWidth : slotStartX;
+                const meshOffsetX = isRightHinge ? -singleDoorWidth / 2 : singleDoorWidth / 2;
+
+                return (
+                    <AnimatedDoor
+                        key={`door-${i}-${width}-${numDoors}`}
+                        position={[pivotX, 0, depth / 2 + DOOR_THICKNESS / 2]}
+                        args={[singleDoorWidth - 2, height - 2, DOOR_THICKNESS]}
+                        hinge={isRightHinge ? 'right' : 'left'}
+                        isOpen={doorsOpen}
+                        meshOffset={[meshOffsetX, 0, 0]}
+                        isTech={isTech}
+                        color={cabinetColor}
+                        viewMode={viewMode}
+                    />
+                );
+            })}
+
+            <ShowDimensions />
+        </group>
+    );
+};
+
+// New component for drawing the door swing arc
+const DoorSwingArc = ({ hinge, width }: { hinge: 'left' | 'right', width: number }) => {
+    // Arc logic:
+    // Hinge Left: Arc starts at (width, 0) relative to pivot, goes to (0, width). 
+    // Pivot is at (0,0,0) in local space of the group?
+    // AnimatedDoor is a group at 'position' (pivot).
+    // Mesh is offset by 'meshOffset'.
+    // We want the arc to be static relative to the *pivot*, NOT rotating with the door.
+    // So we should place it outside the `animated.group` if possible?
+    // OR we place it inside `animated.group` but rotate it inversely?
+    // No, cleaner to place it as sibling or parent. But AnimatedDoor encapsulates the door.
+    // Wait, the user wants the arc visible when 'doorsOpen' is true?
+    // Actually standard drafting creates the arc from closed to open.
+    // So it should be static in the Cabinet frame, but positioned at the pivot.
+    // Let's modify AnimatedDoor to accept a "showArc" prop?
+    // Or render it inside AnimatedDoor but outside the rotation group?
+
+    // Let's render it inside AnimatedDoor but wrap the door mesh in the animated group, 
+    // and keep the arc static in the root of AnimatedDoor (which is positioned at pivot).
+
+    const radius = width;
+    const segments = 20;
+    const points = [];
+
+    // Plan view: X is horizontal, Z is vertical (Top is -Z).
+    // Door closed lies along X axis relative to pivot.
+    // Open door lies along Z axis relative to pivot.
+    // Left Hinge: Pivot on Left. Door goes +X (Closed). Swings to +Z (Open).
+    // Right Hinge: Pivot on Right. Door goes -X (Closed). Swings to +Z (Open).
+
+    for (let i = 0; i <= segments; i++) {
+        const theta = (Math.PI / 2) * (i / segments);
+        if (hinge === 'left') {
+            // Start at (r, 0) -> End at (0, r)
+            // x = r * cos(theta)
+            // z = r * sin(theta)
+            points.push(new THREE.Vector3(radius * Math.cos(theta), 0, radius * Math.sin(theta)));
+        } else {
+            // Start at (-r, 0) -> End at (0, r)
+            // x = -r * cos(theta)
+            // z = r * sin(theta)
+            points.push(new THREE.Vector3(-radius * Math.cos(theta), 0, radius * Math.sin(theta)));
+        }
+    }
+
+    return (
+        <Line
+            points={points}
+            color="black"
+            lineWidth={1}
+            dashed={true}
+            dashScale={1}
+            dashSize={12}
+            gapSize={12}
+        />
+    );
+};
+
+// ... (existing imports, but need Line from drei)
+import { Line } from '@react-three/drei';
+import * as THREE from 'three';
+
+const AnimatedDoor = ({ position, args, hinge, isOpen, meshOffset, isTech, color, viewMode }: any) => {
+    // Open OUTWARD 
+    const { rot } = useSpring({
+        rot: isOpen ? (hinge === 'left' ? -Math.PI / 2 : Math.PI / 2) : 0,
+        config: { mass: 1, tension: 120, friction: 14 }
+    });
+
+    const doorWidth = args[0]; // width is args[0]
+
+    return (
+        <group position={position}>
+            {/* Static Arc for Plan View */}
+            {isTech && viewMode === 'plan' && isOpen && (
+                <DoorSwingArc hinge={hinge} width={doorWidth} />
+            )}
+
+            <animated.group rotation-y={rot}>
+                <mesh position={meshOffset} castShadow receiveShadow>
+                    <boxGeometry args={args} />
+                    {isTech ?
+                        <meshBasicMaterial color="white" polygonOffset polygonOffsetFactor={2} /> :
+                        <meshStandardMaterial color={color} roughness={0.6} />
+                    }
+                    {isTech && <Edges color="black" threshold={10} />}
+                    {!isTech && (
+                        <mesh position={[hinge === 'left' ? args[0] / 2 - 30 : -args[0] / 2 + 30, 0, args[2] / 2 + 8]}>
+                            <sphereGeometry args={[8]} />
+                            <meshStandardMaterial color="silver" />
+                        </mesh>
+                    )}
+                </mesh>
+            </animated.group>
+        </group>
+    );
+};
