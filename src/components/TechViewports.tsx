@@ -91,11 +91,16 @@ const TechView = ({ type, targetCenter, envelopeSize, cameraUp }: { type: 'plan'
 };
 
 export const TechViewports = () => {
-    const { width, height, depth, numCols, doorsOpen, floorHeight, useDoors } = useStore();
+    const { width, depth, floorHeight, blocks } = useStore();
+    const totalHeight = blocks.reduce((sum, block) => sum + block.height, 0);
 
     // Constants matching Cabinet.tsx sizing
     const labelOffset = 200;
-    const doorExtValue = useDoors && doorsOpen ? (width / Math.max(1, numCols)) : 0;
+    const doorExtValue = blocks.reduce((maxExt, block) => {
+        if (!block.useDoors || !block.doorsOpen) return maxExt;
+        const ext = width / Math.max(1, block.numCols);
+        return Math.max(maxExt, ext);
+    }, 0);
 
     // Safety margin to prevent touching viewport edges (white frame requirement)
     // This value represents a "bleed" area around the drawing.
@@ -107,10 +112,10 @@ export const TechViewports = () => {
     const planEnvelopeSize = Math.max(width + labelOffset, depth + doorExtValue + labelOffset) + padding;
 
     // Elevation View Envelope: Max of (Width + labelOffset) and (Height + labelOffset)
-    const elevationEnvelopeSize = Math.max(width + labelOffset, height + labelOffset) + padding;
+    const elevationEnvelopeSize = Math.max(width + labelOffset, totalHeight + labelOffset) + padding;
 
     // Section View Envelope: Max of (Depth + doorExtValue + labelOffset) and (Height + labelOffset)
-    const sectionEnvelopeSize = Math.max(depth + doorExtValue + labelOffset, height + labelOffset) + padding;
+    const sectionEnvelopeSize = Math.max(depth + doorExtValue + labelOffset, totalHeight + labelOffset) + padding;
 
     // UNIFIED SCALING LOGIC
     // To ensure all drawings are at the SAME scale, we must use the largest required envelope
@@ -121,7 +126,7 @@ export const TechViewports = () => {
     // Cabinet is centered at [0, height/2 + floorHeight, 0] in world space.
     // We shift the camera target to center the *entire* envelope (object + labels + doors).
 
-    const techCenterY = height / 2 + floorHeight;
+    const techCenterY = totalHeight / 2 + floorHeight;
     // Horizontal shift for labels on left (X-axis for Plan/Elevation, Z-axis for Section)
     const shiftX = labelOffset / 2;
     // Vertical shift for Plan view (Z-axis): Top is -Z (labels), Bottom is +Z (doors).
