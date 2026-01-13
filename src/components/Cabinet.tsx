@@ -1,6 +1,7 @@
 import { useStore } from '../store/useStore';
 import { useSpring, animated } from '@react-spring/three';
-import { Edges, Text, ContactShadows } from '@react-three/drei';
+import { Edges, Text, ContactShadows, Line } from '@react-three/drei';
+import * as THREE from 'three';
 
 const PANEL_THICKNESS = 18; // mm
 const DOOR_THICKNESS = 18; // mm
@@ -107,7 +108,7 @@ const DimensionLayout = ({ start, end, label, dir = 'h', offset = 160, fontS = 8
 };
 
 export const Cabinet = ({ viewMode = '3d' }: CabinetProps) => {
-    const { width, height, depth, numDoors, doorsOpen, numShelves, floorHeight, cabinetColor } = useStore();
+    const { width, height, depth, numRows, numCols, doorsOpen, useDoors, useDrawers, numShelves, floorHeight, cabinetColor, showSkirting, showFeet, recessDistance, numFeetPerRow } = useStore();
 
     const isTech = viewMode !== '3d';
     const hideSidePanel = viewMode === 'section';
@@ -132,6 +133,22 @@ export const Cabinet = ({ viewMode = '3d' }: CabinetProps) => {
             // Start at Bottom Panel Center + spacing
             const y = (-height / 2 + PANEL_THICKNESS / 2) + spacing * (i + 1);
             shelves.push(y);
+        }
+    }
+
+    // Feet Calculation - Manual input with uniform recess on all edges
+    const feetPerRow = Math.max(2, numFeetPerRow);
+    const feetInset = recessDistance + 20; // +2cm to avoid skirting clash
+    const feetSpacing = feetPerRow > 1 ? (width - 2 * feetInset) / (feetPerRow - 1) : 0;
+    const feet: Array<[number, number, number]> = [];
+
+    if (showFeet && floorHeight > 0) {
+        for (let i = 0; i < feetPerRow; i++) {
+            const x = -width / 2 + feetInset + feetSpacing * i;
+            // Front row
+            feet.push([x, -height / 2 - floorHeight / 2, depth / 2 - feetInset]);
+            // Back row
+            feet.push([x, -height / 2 - floorHeight / 2, -depth / 2 + feetInset]);
         }
     }
 
@@ -172,7 +189,7 @@ export const Cabinet = ({ viewMode = '3d' }: CabinetProps) => {
                         <DimensionLayout start={[-depth / 2, height / 2, 0]} end={[-depth / 2, -height / 2, 0]} label={`${height}`} dir="v" offset={mainOffset + 120} fontS={FONT_SIZE} />
 
                         {/* Shelf spaces (LEFT string) - MEASURED TO CENTER LINES */}
-                        {numShelves > 0 && Array.from({ length: numShelves + 1 }).map((_, idx) => {
+                        {!useDrawers && numShelves > 0 && Array.from({ length: numShelves + 1 }).map((_, idx) => {
                             // Start point (Bottom of dim segment): 
                             // If first segment, Bottom Panel Center. Else, Previous Shelf Center.
                             const prevY = idx === 0 ? (-height / 2 + PANEL_THICKNESS / 2) : shelves[idx - 1];
@@ -241,7 +258,7 @@ export const Cabinet = ({ viewMode = '3d' }: CabinetProps) => {
             </mesh>
 
             {/* Shelves */}
-            {shelves.map((y, idx) => (
+            {(!useDrawers || viewMode !== 'section') && shelves.map((y, idx) => (
                 <mesh key={`shelf-${idx}`} position={[0, y, 0]} castShadow receiveShadow>
                     <boxGeometry args={[width - 2 * PANEL_THICKNESS, PANEL_THICKNESS, depth - 20]} />
                     {currentMaterial}
@@ -250,27 +267,119 @@ export const Cabinet = ({ viewMode = '3d' }: CabinetProps) => {
             ))}
 
             {/* Doors */}
-            {viewMode !== 'section' && numDoors > 0 && Array.from({ length: numDoors }).map((_, i) => {
-                const singleDoorWidth = width / numDoors;
-                const slotStartX = -width / 2 + i * singleDoorWidth;
-                const isRightHinge = i % 2 !== 0;
-                const pivotX = isRightHinge ? slotStartX + singleDoorWidth : slotStartX;
-                const meshOffsetX = isRightHinge ? -singleDoorWidth / 2 : singleDoorWidth / 2;
+            {useDoors && viewMode !== 'section' && numRows > 0 && numCols > 0 && Array.from({ length: numRows }).map((_, row) => {
+                const cellHeight = height / numRows;
+                const centerY = -height / 2 + cellHeight / 2 + cellHeight * row;
 
-                return (
-                    <AnimatedDoor
-                        key={`door-${i}-${width}-${numDoors}`}
-                        position={[pivotX, 0, depth / 2 + DOOR_THICKNESS / 2]}
-                        args={[singleDoorWidth - 2, height - 2, DOOR_THICKNESS]}
-                        hinge={isRightHinge ? 'right' : 'left'}
-                        isOpen={doorsOpen}
-                        meshOffset={[meshOffsetX, 0, 0]}
-                        isTech={isTech}
-                        color={cabinetColor}
-                        viewMode={viewMode}
-                    />
-                );
+                return Array.from({ length: numCols }).map((_, col) => {
+                    const cellWidth = width / numCols;
+                    const centerX = -width / 2 + cellWidth / 2 + cellWidth * col;
+                    const isRightHinge = col % 2 !== 0;
+                    const pivotX = isRightHinge ? centerX + cellWidth / 2 : centerX - cellWidth / 2;
+                    const meshOffsetX = isRightHinge ? -cellWidth / 2 : cellWidth / 2;
+
+                    return (
+                        <AnimatedDoor
+                            key={`door-${row}-${col}-${width}-${height}-${numRows}-${numCols}`}
+                            position={[pivotX, centerY, depth / 2 + DOOR_THICKNESS / 2]}
+                            args={[cellWidth - 2, cellHeight - 2, DOOR_THICKNESS]}
+                            hinge={isRightHinge ? 'right' : 'left'}
+                            isOpen={doorsOpen}
+                            meshOffset={[meshOffsetX, 0, 0]}
+                            isTech={isTech}
+                            color={cabinetColor}
+                            viewMode={viewMode}
+                        />
+                    );
+                });
             })}
+
+            {/* Drawers */}
+            {useDrawers && numRows > 0 && numCols > 0 && Array.from({ length: numRows }).map((_, row) => {
+                const drawerGap = 2;
+                const cellHeight = height / numRows;
+                const drawerFaceHeight = cellHeight - drawerGap;
+                const centerY = -height / 2 + cellHeight / 2 + cellHeight * row;
+
+                return Array.from({ length: numCols }).map((_, col) => {
+                    const cellWidth = width / numCols;
+                    const centerX = -width / 2 + cellWidth / 2 + cellWidth * col;
+                    const handleOffsetX = cellWidth / 3.5;
+
+                    const drawerKey = `drawer-${row}-${col}-${width}-${height}-${numRows}-${numCols}`;
+
+                    if (isTech && viewMode === 'section') {
+                        if (col !== 0) return null;
+                        const yTop = centerY + drawerFaceHeight / 2;
+                        const yBottom = centerY - drawerFaceHeight / 2;
+                        const zFront = depth / 2 - PANEL_THICKNESS;
+                        const zBack = -depth / 2 + PANEL_THICKNESS;
+
+                        return (
+                            <group key={drawerKey}>
+                                <Line
+                                    points={[
+                                        [0, yBottom, zFront],
+                                        [0, yTop, zFront],
+                                        [0, yTop, zBack],
+                                        [0, yBottom, zBack],
+                                        [0, yBottom, zFront],
+                                    ]}
+                                    color="black"
+                                    lineWidth={1}
+                                />
+                                <mesh position={[0, centerY, depth / 2 + DOOR_THICKNESS / 2 + 8]}>
+                                    <sphereGeometry args={[8]} />
+                                    <meshBasicMaterial color="black" />
+                                </mesh>
+                            </group>
+                        );
+                    }
+
+                    return (
+                        <mesh
+                            key={drawerKey}
+                            position={[centerX, centerY, depth / 2 + DOOR_THICKNESS / 2]}
+                            castShadow
+                            receiveShadow
+                        >
+                            <boxGeometry args={[cellWidth - 2, drawerFaceHeight, DOOR_THICKNESS]} />
+                            {currentMaterial}
+                            <EdgeOverlay />
+                            {(!isTech || viewMode === 'elevation') && (
+                                <>
+                                    <mesh position={[-handleOffsetX, 0, DOOR_THICKNESS / 2 + 8]}>
+                                        <sphereGeometry args={[8]} />
+                                        {isTech ? <meshBasicMaterial color="black" /> : <meshStandardMaterial color="silver" />}
+                                    </mesh>
+                                    <mesh position={[handleOffsetX, 0, DOOR_THICKNESS / 2 + 8]}>
+                                        <sphereGeometry args={[8]} />
+                                        {isTech ? <meshBasicMaterial color="black" /> : <meshStandardMaterial color="silver" />}
+                                    </mesh>
+                                </>
+                            )}
+                        </mesh>
+                    );
+                });
+            })}
+
+            {/* Skirting */}
+            {showSkirting && floorHeight > 0 && (
+                <mesh position={[0, -height / 2 - floorHeight / 2, recessDistance / 2]} castShadow receiveShadow>
+                    <boxGeometry args={[width, floorHeight, depth - recessDistance]} />
+                    {currentAccent}
+                    <EdgeOverlay />
+                </mesh>
+            )}
+
+            {/* Feet */}
+            {feet.map((pos, idx) => (
+                <mesh key={`foot-${idx}`} position={pos} castShadow receiveShadow>
+                    <cylinderGeometry args={[15, 15, floorHeight, 16]} />
+                    {isTech ? techMaterial : <meshStandardMaterial color={cabinetColor} roughness={0.6} />}
+                    <EdgeOverlay />
+                </mesh>
+            ))}
 
             <ShowDimensions />
         </group>
@@ -335,10 +444,6 @@ const DoorSwingArc = ({ hinge, width }: { hinge: 'left' | 'right', width: number
     );
 };
 
-// ... (existing imports, but need Line from drei)
-import { Line } from '@react-three/drei';
-import * as THREE from 'three';
-
 const AnimatedDoor = ({ position, args, hinge, isOpen, meshOffset, isTech, color, viewMode }: any) => {
     // Open OUTWARD 
     const { rot } = useSpring({
@@ -363,10 +468,10 @@ const AnimatedDoor = ({ position, args, hinge, isOpen, meshOffset, isTech, color
                         <meshStandardMaterial color={color} roughness={0.6} />
                     }
                     {isTech && <Edges color="black" threshold={10} />}
-                    {!isTech && (
+                    {(!isTech || viewMode === 'elevation') && (
                         <mesh position={[hinge === 'left' ? args[0] / 2 - 30 : -args[0] / 2 + 30, 0, args[2] / 2 + 8]}>
                             <sphereGeometry args={[8]} />
-                            <meshStandardMaterial color="silver" />
+                            {isTech ? <meshBasicMaterial color="black" /> : <meshStandardMaterial color="silver" />}
                         </mesh>
                     )}
                 </mesh>

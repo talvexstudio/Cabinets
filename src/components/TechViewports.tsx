@@ -91,11 +91,11 @@ const TechView = ({ type, targetCenter, envelopeSize, cameraUp }: { type: 'plan'
 };
 
 export const TechViewports = () => {
-    const { width, height, depth, numDoors, doorsOpen, floorHeight } = useStore();
+    const { width, height, depth, numCols, doorsOpen, floorHeight, useDoors } = useStore();
 
     // Constants matching Cabinet.tsx sizing
     const labelOffset = 200;
-    const doorExtValue = doorsOpen ? (width / Math.max(1, numDoors)) : 0;
+    const doorExtValue = useDoors && doorsOpen ? (width / Math.max(1, numCols)) : 0;
 
     // Safety margin to prevent touching viewport edges (white frame requirement)
     // This value represents a "bleed" area around the drawing.
