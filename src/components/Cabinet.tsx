@@ -159,6 +159,21 @@ export const Cabinet = ({ viewMode = '3d' }: CabinetProps) => {
         if (!isTech) return null;
 
         const mainOffset = 180;
+        const middleOffset = 340;
+        const outerOffset = 500;
+        const baseHeight = Math.max(0, floorHeight);
+        const totalWithBase = totalHeight + baseHeight;
+        const cabinetTopY = totalHeight / 2;
+        const cabinetBottomY = -totalHeight / 2;
+        const baseBottomY = cabinetBottomY - baseHeight;
+        const blockBounds = blocks.map((block, index) => {
+            const baseY = -totalHeight / 2 + blocks.slice(0, index).reduce((sum, b) => sum + b.height, 0);
+            return {
+                block,
+                baseY,
+                topY: baseY + block.height,
+            };
+        });
 
         return (
             <group>
@@ -166,7 +181,56 @@ export const Cabinet = ({ viewMode = '3d' }: CabinetProps) => {
                 {viewMode === 'elevation' && (
                     <group position-z={depth / 2}>
                         <DimensionLayout start={[-width / 2, totalHeight / 2, 0]} end={[width / 2, totalHeight / 2, 0]} label={`${width}`} dir="h" offset={mainOffset} fontS={FONT_SIZE} />
-                        <DimensionLayout start={[-width / 2, totalHeight / 2, 0]} end={[-width / 2, -totalHeight / 2, 0]} label={`${totalHeight}`} dir="v" offset={mainOffset} fontS={FONT_SIZE} />
+                        <DimensionLayout start={[-width / 2, cabinetTopY, 0]} end={[-width / 2, baseBottomY, 0]} label={`${totalWithBase}`} dir="v" offset={outerOffset} fontS={FONT_SIZE} />
+                        {baseHeight > 0 && (
+                            <DimensionLayout start={[-width / 2, cabinetBottomY, 0]} end={[-width / 2, baseBottomY, 0]} label={`${baseHeight}`} dir="v" offset={middleOffset} fontS={FONT_SIZE} />
+                        )}
+                        {blockBounds.map(({ block, baseY, topY }) => (
+                            <DimensionLayout key={`block-height-${block.id}`} start={[-width / 2, topY, 0]} end={[-width / 2, baseY, 0]} label={`${block.height}`} dir="v" offset={middleOffset} fontS={FONT_SIZE} />
+                        ))}
+                        {blockBounds.map(({ block, baseY }) => {
+                            if (block.useDrawers) {
+                                const cellHeight = block.height / block.numRows;
+                                return Array.from({ length: block.numRows }).map((_, idx) => {
+                                    const startY = baseY + cellHeight * idx;
+                                    const endY = startY + cellHeight;
+                                    return (
+                                        <DimensionLayout
+                                            key={`drawer-dim-elev-${block.id}-${idx}`}
+                                            start={[-width / 2, endY, 0]}
+                                            end={[-width / 2, startY, 0]}
+                                            label={`${Math.round(cellHeight)}`}
+                                            dir="v"
+                                            offset={mainOffset}
+                                            fontS={FONT_SIZE}
+                                        />
+                                    );
+                                });
+                            }
+
+                            if (block.numShelves > 0) {
+                                const shelves = getShelvesForBlock(block.height, block.numShelves);
+                                return Array.from({ length: block.numShelves + 1 }).map((_, idx) => {
+                                    const prevY = idx === 0 ? (baseY + PANEL_THICKNESS / 2) : baseY + block.height / 2 + shelves[idx - 1];
+                                    const currentY = idx === block.numShelves ? (baseY + block.height - PANEL_THICKNESS / 2) : baseY + block.height / 2 + shelves[idx];
+                                    const space = Math.round(currentY - prevY);
+
+                                    return (
+                                        <DimensionLayout
+                                            key={`shelf-dim-elev-${block.id}-${idx}`}
+                                            start={[-width / 2, currentY, 0]}
+                                            end={[-width / 2, prevY, 0]}
+                                            label={`${space}`}
+                                            dir="v"
+                                            offset={mainOffset}
+                                            fontS={FONT_SIZE}
+                                        />
+                                    );
+                                });
+                            }
+
+                            return null;
+                        })}
                     </group>
                 )}
 
@@ -184,32 +248,60 @@ export const Cabinet = ({ viewMode = '3d' }: CabinetProps) => {
                 {viewMode === 'section' && (
                     <group rotation-y={Math.PI / 2} position-x={width / 2}>
                         {/* Overall Depth (TOP) */}
-                        <DimensionLayout start={[-depth / 2, totalHeight / 2, 0]} end={[depth / 2, totalHeight / 2, 0]} label={`${depth}`} dir="h" offset={mainOffset} fontS={FONT_SIZE} />
+                        <DimensionLayout start={[-depth / 2, cabinetTopY, 0]} end={[depth / 2, cabinetTopY, 0]} label={`${depth}`} dir="h" offset={mainOffset} fontS={FONT_SIZE} />
 
                         {/* Overall Height (LEFT) */}
-                        <DimensionLayout start={[-depth / 2, totalHeight / 2, 0]} end={[-depth / 2, -totalHeight / 2, 0]} label={`${totalHeight}`} dir="v" offset={mainOffset + 120} fontS={FONT_SIZE} />
+                        <DimensionLayout start={[-depth / 2, cabinetTopY, 0]} end={[-depth / 2, baseBottomY, 0]} label={`${totalWithBase}`} dir="v" offset={outerOffset} fontS={FONT_SIZE} />
+                        {baseHeight > 0 && (
+                            <DimensionLayout start={[-depth / 2, cabinetBottomY, 0]} end={[-depth / 2, baseBottomY, 0]} label={`${baseHeight}`} dir="v" offset={middleOffset} fontS={FONT_SIZE} />
+                        )}
+                        {blockBounds.map(({ block, baseY, topY }) => (
+                            <DimensionLayout key={`block-height-section-${block.id}`} start={[-depth / 2, topY, 0]} end={[-depth / 2, baseY, 0]} label={`${block.height}`} dir="v" offset={middleOffset} fontS={FONT_SIZE} />
+                        ))}
 
                         {/* Shelf spaces (LEFT string) - MEASURED TO CENTER LINES */}
-                        {blocks.map((block, blockIndex) => {
-                            if (block.useDrawers || block.numShelves <= 0) return null;
-                            const shelves = getShelvesForBlock(block.height, block.numShelves);
-                            const blockBaseY = -totalHeight / 2 + blocks.slice(0, blockIndex).reduce((sum, b) => sum + b.height, 0);
+                        {blockBounds.map(({ block, baseY }) => {
+                            if (block.useDrawers) {
+                                const cellHeight = block.height / block.numRows;
+                                return Array.from({ length: block.numRows }).map((_, idx) => {
+                                    const startY = baseY + cellHeight * idx;
+                                    const endY = startY + cellHeight;
+                                    return (
+                                        <DimensionLayout
+                                            key={`drawer-dim-section-${block.id}-${idx}`}
+                                            start={[-depth / 2, endY, 0]}
+                                            end={[-depth / 2, startY, 0]}
+                                            label={`${Math.round(cellHeight)}`}
+                                            dir="v"
+                                            offset={mainOffset}
+                                            fontS={FONT_SIZE}
+                                        />
+                                    );
+                                });
+                            }
 
-                            return Array.from({ length: block.numShelves + 1 }).map((_, idx) => {
-                                const prevY = idx === 0 ? (blockBaseY + PANEL_THICKNESS / 2) : blockBaseY + block.height / 2 + shelves[idx - 1];
-                                const currentY = idx === block.numShelves ? (blockBaseY + block.height - PANEL_THICKNESS / 2) : blockBaseY + block.height / 2 + shelves[idx];
-                                const space = Math.round(currentY - prevY);
+                            if (block.numShelves > 0) {
+                                const shelves = getShelvesForBlock(block.height, block.numShelves);
+                                return Array.from({ length: block.numShelves + 1 }).map((_, idx) => {
+                                    const prevY = idx === 0 ? (baseY + PANEL_THICKNESS / 2) : baseY + block.height / 2 + shelves[idx - 1];
+                                    const currentY = idx === block.numShelves ? (baseY + block.height - PANEL_THICKNESS / 2) : baseY + block.height / 2 + shelves[idx];
+                                    const space = Math.round(currentY - prevY);
 
-                                return (
-                                    <DimensionLayout
-                                        key={`shelf-dim-${block.id}-${idx}`}
-                                        start={[-depth / 2, currentY, 0]}
-                                        end={[-depth / 2, prevY, 0]}
-                                        label={`${space}`}
-                                        dir="v" offset={mainOffset} fontS={FONT_SIZE}
-                                    />
-                                );
-                            });
+                                    return (
+                                        <DimensionLayout
+                                            key={`shelf-dim-section-${block.id}-${idx}`}
+                                            start={[-depth / 2, currentY, 0]}
+                                            end={[-depth / 2, prevY, 0]}
+                                            label={`${space}`}
+                                            dir="v"
+                                            offset={mainOffset}
+                                            fontS={FONT_SIZE}
+                                        />
+                                    );
+                                });
+                            }
+
+                            return null;
                         })}
                     </group>
                 )}
