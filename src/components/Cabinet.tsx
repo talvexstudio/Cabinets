@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import { useSpring, animated } from '@react-spring/three';
 import { Edges, Text, ContactShadows, Line } from '@react-three/drei';
@@ -110,7 +111,8 @@ const DimensionLayout = ({ start, end, label, dir = 'h', offset = 160, fontS = 8
 };
 
 export const Cabinet = ({ viewMode = '3d' }: CabinetProps) => {
-    const { width, depth, blocks, floorHeight, cabinetColor, showSkirting, showFeet, recessDistance, numFeetPerRow } = useStore();
+    const { width, depth, blocks, floorHeight, cabinetColor, showSkirting, showFeet, recessDistance, numFeetPerRow, exportRoot, setExportRoot } = useStore();
+    const rootRef = useRef<THREE.Group>(null);
 
     const isTech = viewMode !== '3d';
     const hideSidePanel = viewMode === 'section';
@@ -125,6 +127,15 @@ export const Cabinet = ({ viewMode = '3d' }: CabinetProps) => {
     const EdgeOverlay = () => isTech ? <Edges color="black" threshold={10} /> : null;
 
     const totalHeight = blocks.reduce((sum, block) => sum + block.height, 0);
+
+    useEffect(() => {
+        if (viewMode === '3d') {
+            const root = rootRef.current;
+            if (root && exportRoot !== root) {
+                setExportRoot(root);
+            }
+        }
+    }, [exportRoot, setExportRoot, viewMode]);
 
     const getShelvesForBlock = (blockHeight: number, numShelves: number) => {
         const shelves: number[] = [];
@@ -410,7 +421,7 @@ export const Cabinet = ({ viewMode = '3d' }: CabinetProps) => {
     };
 
     return (
-        <group position-y={totalHeight / 2 + floorHeight}>
+        <group position-y={totalHeight / 2 + floorHeight} ref={rootRef}>
             {!isTech && (
                 <ContactShadows
                     opacity={0.8}

@@ -9,14 +9,12 @@ function App() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div ref={containerRef} style={{ width: '100vw', height: '100vh', display: 'flex' }}>
-      <div className="main-container">
-        <div className="viewport-3d-container">
-          <MainViewport />
-        </div>
-        <div className="viewports-2d-container">
-          <TechViewports />
-        </div>
+    <div ref={containerRef} className="app-grid">
+      <div className="viewport-3d-container">
+        <MainViewport />
+      </div>
+      <div className="viewports-2d-container">
+        <TechViewports />
       </div>
       <Sidebar />
 

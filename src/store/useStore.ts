@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type * as THREE from 'three';
 
 interface CabinetBlock {
   id: string;
@@ -34,6 +35,8 @@ interface CabinetState {
   setShowFeet: (show: boolean) => void;
   setRecessDistance: (dist: number) => void;
   setNumFeetPerRow: (num: number) => void;
+  exportRoot: THREE.Object3D | null;
+  setExportRoot: (root: THREE.Object3D | null) => void;
   addBlock: () => void;
   removeBlock: (id: string) => void;
   updateBlock: (id: string, changes: Partial<CabinetBlock>) => void;
@@ -59,6 +62,7 @@ export const useStore = create<CabinetState>((set) => ({
   showFeet: false,
   recessDistance: 50,
   numFeetPerRow: 2,
+  exportRoot: null,
   blocks: [
     {
       id: 'block-1',
@@ -84,6 +88,7 @@ export const useStore = create<CabinetState>((set) => ({
   setShowFeet: (show) => set({ showFeet: show }),
   setRecessDistance: (dist) => set({ recessDistance: dist }),
   setNumFeetPerRow: (num) => set({ numFeetPerRow: Math.max(2, num) }),
+  setExportRoot: (root) => set({ exportRoot: root }),
   addBlock: () =>
     set((state) => ({
       blocks: [
