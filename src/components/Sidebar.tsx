@@ -29,7 +29,7 @@ export const Sidebar = () => {
     };
 
     const handleExport = async () => {
-        console.log('Export PDF Triggered');
+        console.log('[Sidebar] Export PDF clicked');
         try {
             await exportPDF();
         } catch (e) {
