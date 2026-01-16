@@ -8,6 +8,10 @@ interface CabinetBlock {
   doorsOpen: boolean;
   useDoors: boolean;
   useDrawers: boolean;
+  useTrunk: boolean;
+  lidHeight: number;
+  lidOpen: boolean;
+  drawersOpen: boolean;
   numShelves: number;
 }
 
@@ -64,6 +68,10 @@ export const useStore = create<CabinetState>((set) => ({
       doorsOpen: true,
       useDoors: true,
       useDrawers: false,
+      useTrunk: false,
+      lidHeight: 60,
+      lidOpen: false,
+      drawersOpen: false,
       numShelves: 2,
     },
   ],
@@ -88,6 +96,10 @@ export const useStore = create<CabinetState>((set) => ({
           doorsOpen: true,
           useDoors: true,
           useDrawers: false,
+          useTrunk: false,
+          lidHeight: 60,
+          lidOpen: false,
+          drawersOpen: false,
           numShelves: 2,
         },
       ],
@@ -118,6 +130,10 @@ export const useStore = create<CabinetState>((set) => ({
         doorsOpen: block.doorsOpen,
         useDoors: block.useDoors,
         useDrawers: block.useDrawers,
+        useTrunk: block.useTrunk ?? false,
+        lidHeight: Math.max(0, block.lidHeight ?? 60),
+        lidOpen: block.lidOpen ?? false,
+        drawersOpen: block.drawersOpen ?? false,
         numShelves: block.numShelves,
       })),
     }),

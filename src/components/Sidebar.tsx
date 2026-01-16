@@ -253,6 +253,7 @@ export const Sidebar = () => {
                                                 updateBlock(block.id, {
                                                     useDoors: e.target.checked,
                                                     useDrawers: e.target.checked ? false : block.useDrawers,
+                                                    useTrunk: e.target.checked ? false : block.useTrunk,
                                                 })
                                             }
                                         />
@@ -265,31 +266,61 @@ export const Sidebar = () => {
                                                 updateBlock(block.id, {
                                                     useDrawers: e.target.checked,
                                                     useDoors: e.target.checked ? false : block.useDoors,
+                                                    useTrunk: e.target.checked ? false : block.useTrunk,
                                                 })
                                             }
                                         />
                                         <label htmlFor={`useDrawers-${block.id}`}>Drawers</label>
+                                        <input
+                                            type="checkbox"
+                                            id={`useTrunk-${block.id}`}
+                                            checked={block.useTrunk}
+                                            onChange={(e) =>
+                                                updateBlock(block.id, {
+                                                    useTrunk: e.target.checked,
+                                                    useDoors: e.target.checked ? false : block.useDoors,
+                                                    useDrawers: e.target.checked ? false : block.useDrawers,
+                                                })
+                                            }
+                                        />
+                                        <label htmlFor={`useTrunk-${block.id}`}>Trunk</label>
                                     </div>
                                 </div>
 
-                                <div className="control-group">
-                                    <div className="control-inline">
-                                        <label>Rows</label>
-                                        <input
-                                            type="number"
-                                            min={1}
-                                            value={block.numRows}
-                                            onChange={(e) => updateBlock(block.id, { numRows: Number(e.target.value) })}
-                                        />
-                                        <label>Columns</label>
-                                        <input
-                                            type="number"
-                                            min={1}
-                                            value={block.numCols}
-                                            onChange={(e) => updateBlock(block.id, { numCols: Number(e.target.value) })}
-                                        />
+                                {!block.useTrunk && (
+                                    <div className="control-group">
+                                        <div className="control-inline">
+                                            <label>Rows</label>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                value={block.numRows}
+                                                onChange={(e) => updateBlock(block.id, { numRows: Number(e.target.value) })}
+                                            />
+                                            <label>Columns</label>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                value={block.numCols}
+                                                onChange={(e) => updateBlock(block.id, { numCols: Number(e.target.value) })}
+                                            />
+                                        </div>
                                     </div>
-                                </div>
+                                )}
+
+                                {block.useTrunk && (
+                                    <div className="control-group">
+                                        <div className="control-inline">
+                                            <label>Lid Height (mm)</label>
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                value={block.lidHeight}
+                                                onChange={(e) => updateBlock(block.id, { lidHeight: Number(e.target.value) })}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
 
                                 {block.useDoors && (
                                     <div className="control-group checkbox-group">
@@ -303,7 +334,31 @@ export const Sidebar = () => {
                                     </div>
                                 )}
 
-                                {!block.useDrawers && (
+                                {block.useTrunk && (
+                                    <div className="control-group checkbox-group">
+                                        <input
+                                            type="checkbox"
+                                            id={`lidOpen-${block.id}`}
+                                            checked={block.lidOpen}
+                                            onChange={(e) => updateBlock(block.id, { lidOpen: e.target.checked })}
+                                        />
+                                        <label htmlFor={`lidOpen-${block.id}`}>Open Lid</label>
+                                    </div>
+                                )}
+
+                                {block.useDrawers && (
+                                    <div className="control-group checkbox-group">
+                                        <input
+                                            type="checkbox"
+                                            id={`drawersOpen-${block.id}`}
+                                            checked={block.drawersOpen}
+                                            onChange={(e) => updateBlock(block.id, { drawersOpen: e.target.checked })}
+                                        />
+                                        <label htmlFor={`drawersOpen-${block.id}`}>Open Drawers</label>
+                                    </div>
+                                )}
+
+                                {!block.useDrawers && !block.useTrunk && (
                                     <div className="control-group">
                                         <label>Number of Shelves</label>
                                         <input
