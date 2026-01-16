@@ -2,7 +2,6 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
 export const exportPDF = async () => {
-    console.log('[exportPDF] start');
     // A3 Size: 297mm x 420mm (Portrait) or 420mm x 297mm (Landscape)
     const doc = new jsPDF({
         orientation: 'landscape',
@@ -20,7 +19,6 @@ export const exportPDF = async () => {
         document.querySelectorAll<HTMLElement>('.viewport-3d-container, .viewports-2d-container')
     );
     if (targetAreas.length === 0) {
-        console.warn('[exportPDF] No target areas found for export.');
         alert('Export failed: export area not found.');
         return;
     }
@@ -37,8 +35,6 @@ export const exportPDF = async () => {
         width: maxRight - minLeft,
         height: maxBottom - minTop,
     };
-    console.log('[exportPDF] capture rect', rect);
-
     let canvas: HTMLCanvasElement;
     try {
         canvas = await html2canvas(document.body, {
@@ -55,11 +51,10 @@ export const exportPDF = async () => {
             },
         });
     } catch (error) {
-        console.error('[exportPDF] html2canvas failed', error);
+        console.error('Export Failed', error);
         alert('Failed to export PDF. See console for details.');
         return;
     }
-    console.log('[exportPDF] canvas ready', { width: canvas.width, height: canvas.height });
 
     const imgData = canvas.toDataURL('image/png');
 
@@ -78,12 +73,10 @@ export const exportPDF = async () => {
     doc.addImage(imgData, 'PNG', margin, margin, destW, destH);
 
     const pdfBlob = doc.output('blob');
-    console.log('[exportPDF] pdf blob size', pdfBlob.size);
     const pdfUrl = URL.createObjectURL(pdfBlob);
     const link = document.createElement('a');
     link.href = pdfUrl;
     link.download = 'cabinet-design.pdf';
     link.click();
     URL.revokeObjectURL(pdfUrl);
-    console.log('[exportPDF] download triggered');
 };
